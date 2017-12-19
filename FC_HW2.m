@@ -1,0 +1,115 @@
+function [Option_value_BS, Option_value_MC, Option_value_CRRBT] = FC_HW2(So, K, r, q, sigma, T, NoS, NoR, n)
+    
+
+    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    %   Black Scholes model   %%%%%%%%%%%%%%%%
+    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    
+    [Call_Option_value_BS, Put_Option_value_BS] = blsprice(So, K, r, T, sigma, q);
+    fprintf('BS Call Value is %f\n',Call_Option_value_BS);
+    fprintf('BS Put Value is %f\n',Put_Option_value_BS);
+    fprintf('\n');
+	
+	
+    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    %   Monte Carlo Simulation  %%%%%%%%%%%%%%%%
+    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+     for i=1:NoR  
+            %call random samples%
+            samples = normrnd( (log(So)+(r-q-(sigma.^2)/2)*T) , (sigma)*sqrt(T), 1, NoS);
+            %Stock price at time T%
+            ST_samples = exp(samples);
+            
+            for j=1:NoS
+                   if(ST_samples(j)>=K) 
+                       call_rnd(j) = ST_samples(j) - K;
+                   else 
+                       call_rnd(j) = 0;
+                   end
+            end
+            CallMC(i) = exp(-r*T)*mean(call_rnd);
+             
+            %put random samples%
+            samples = normrnd( (log(So)+(r-q-(sigma.^2)/2)*T) , (sigma)*sqrt(T), 1, NoS);
+            %Stock price at time T%
+            ST_samples = exp(samples);
+            
+            for j=1:NoS
+                   if(ST_samples(j)<=K) 
+                       put_rnd(j) = K-ST_samples(j);
+                   else 
+                       put_rnd(j) = 0;
+                   end
+            end
+             PutMC(i) = exp(-r*T)*mean(put_rnd);
+             
+     end
+     
+    Call_Option_value_MC = mean(CallMC);
+    Put_Option_value_MC =  mean(PutMC);
+    Call_Option_value_MC_std = std(CallMC);
+    Put_Option_value_MC_std = std(PutMC);
+	 
+	fprintf('Monte Carlo Call Value is %f\n',Call_Option_value_MC);
+	fprintf('and 95 confidence : %f ~ %f\n',Call_Option_value_MC-2*Call_Option_value_MC_std,Call_Option_value_MC+2*Call_Option_value_MC_std);
+	fprintf('\n');
+	
+    fprintf('Monte Carlo Put Value is %f\n',Put_Option_value_MC);
+    fprintf('and 95 confidence : %f ~ %f\n',Put_Option_value_MC-2*Put_Option_value_MC_std, Put_Option_value_MC+2*Put_Option_value_MC_std);
+    
+	
+	%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    %   CRR binomial tree model   %%%%%%%%%%%%%%%%
+    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    
+    delta_t = T/n;                  % the period
+    u = exp(sigma*sqrt(delta_t));   % up ratio
+    d = 1/u;                        % down ratio
+    p = (exp((r-q)*delta_t)-d)/(u-d);   % up probability
+    S(1,1)=So;                      % current stock price
+    
+    % Build the Stock price tree %
+    for i=2:n+1 
+       for j=1:i
+            S(i,j) = So*(u.^(i-j))*(d.^(j-1));
+       end
+    end
+    
+    % Compute the option prcie at time T %
+    for j=1:n+1
+       %European Option%  
+       c_E(n+1,j) = max(S(n+1,j)-K,0);
+       p_E(n+1,j) = max(K-S(n+1,j),0);
+       
+       %American Option%
+       c_A(n+1,j) = max(S(n+1,j)-K,0);
+	   p_A(n+1,j) = max(K-S(n+1,j),0);
+    end 
+    
+    % Compute the option prcie at ecah time point %
+    for i=1:n 
+       for j=1:n+1-i
+           %European Option% 
+            c_E(n+1-i,j) = exp(-r*delta_t)*(p*c_E(n+1-i+1,j) + (1-p)*c_E(n+1-i+1,j+1));
+            p_E(n+1-i,j) = exp(-r*delta_t)*(p*p_E(n+1-i+1,j) + (1-p)*p_E(n+1-i+1,j+1));
+            
+            %American Option%
+            c_A(n+1-i,j) = max(exp(-r*delta_t)*(p*c_A(n+1-i+1,j) + (1-p)*c_A(n+1-i+1,j+1)), S(n+1-i,j)-K);
+            p_A(n+1-i,j) = max(exp(-r*delta_t)*(p*p_A(n+1-i+1,j) + (1-p)*p_A(n+1-i+1,j+1)), K-S(n+1-i,j));
+       end
+    end
+    % The current option value%
+    Euro_Call_Option_value_CRRBT  = c_E(1,1);
+    Euro_Put_Option_value_CRRBT  = p_E(1,1);
+	Ame_Call_Option_value_CRRBT  = c_A(1,1);
+    Ame_Put_Option_value_CRRBT  = p_A(1,1);
+	
+	fprintf('\n');
+	fprintf('CRRBT Euro Call Value is %f\n',Euro_Call_Option_value_CRRBT);
+    fprintf('CRRBT Euro Put Value is %f\n',Euro_Put_Option_value_CRRBT);
+	
+	fprintf('\n');
+	fprintf('CRRBT American Call Value is %f\n',Ame_Call_Option_value_CRRBT);
+    fprintf('CRRBT American Put Value is %f\n',Ame_Put_Option_value_CRRBT);
+    
+end
