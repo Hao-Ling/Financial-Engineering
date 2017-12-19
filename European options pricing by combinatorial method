@@ -28,3 +28,4 @@ function [Call_Value, Put_Value] = F_Com_HW2Bonus2(S0, K, r, q, sigma, T, NS, NR
         Put_Value = exp(-r*T)*Put_Value;
 	
 end
+
